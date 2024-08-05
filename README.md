@@ -1,2 +1,2 @@
 # DunkOrSpam-CS
-DunkOrSlam chat spam
+Rewritten in C# because it was getting absurd
