@@ -75,10 +75,10 @@ public class Bot(int hwnd) {
 				HandlePing(msg);
 				return;
 			case MessageType.PRIVMSG:
-				HandlePrivateMessage(msg, out prefix);
+				HandlePrivateMessage(msg, ref prefix);
 				break;
 			case MessageType.USERNOTICE:
-				HandleUserNotice(msg, out prefix);
+				HandleUserNotice(msg, ref prefix);
 				break;
 			case MessageType.NONE:
 				logger.Error($"Message with unknown type: {msg.Body}");
@@ -100,9 +100,7 @@ public class Bot(int hwnd) {
 		ws!.Send($"PONG {msg.Body}");
 	}
 
-	private void HandlePrivateMessage(Message msg, out LogColor prefix) {
-		prefix = LogColor.Reset;
-
+	private void HandlePrivateMessage(Message msg, ref LogColor prefix) {
 		// Disconnect if channel changes (Such as from a raid)
 		if (msg.Channel != options.Channel) {
 			logger.Warn("Channel changed. Shutting down");
@@ -122,9 +120,7 @@ public class Bot(int hwnd) {
 		
 	}
 
-	private void HandleUserNotice(Message msg, out LogColor prefix) {
-		prefix = LogColor.Reset;
-
+	private void HandleUserNotice(Message msg, ref LogColor prefix) {
 		if (msg.Tags["msg-id"].Contains("sub")) {
 			logger.Log("New subscriber message found, queueing message...");
 			prefix = LogColor.BgCyan;
