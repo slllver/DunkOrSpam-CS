@@ -64,12 +64,12 @@ public class Message {
 	}
 
 	private static MessageType GetType(string input) {
-		MessageType output;
+		MessageType output; 
 		
 		if (int.TryParse(input, out _)) {
 			output = MessageType.NUM;
-		} else if (!Enum.TryParse(input, out output)) {
-			output = MessageType.NUM;
+		} else {
+			Enum.TryParse(input, out output);
 		}
 
 		return output;

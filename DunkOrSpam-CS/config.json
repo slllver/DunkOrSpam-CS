@@ -1,0 +1,12 @@
+{
+  "oAuth": "oauth:",
+  "nick": "",
+  "channel": "dunkorslam",
+  "minimum": 0,
+  "maximum": 30,
+  "messages": [
+    "dnkMM dnkMM dnkMM",
+    "dnkMM dnkMM",
+    "dnkSub dnkSub"
+  ]
+}
