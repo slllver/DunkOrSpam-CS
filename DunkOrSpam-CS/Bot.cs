@@ -1,5 +1,5 @@
 using System.Security.Authentication;
-using System.Text.RegularExpressions;
+using DunkOrSpam_CS.message;
 using DunkOrSpam_CS.scheduler;
 using DunkOrSpam_CS.utils;
 using Newtonsoft.Json;
@@ -12,14 +12,16 @@ using Logger = DunkOrSpam_CS.utils.Logger;
 
 namespace DunkOrSpam_CS;
 
-public partial class Bot {
+public class Bot(int hwnd) {
 
 	private const string Uri = "wss://irc-ws.chat.twitch.tv:443";
 
 	private readonly Logger logger = Program.Logger!;
 	private readonly Scheduler scheduler = Scheduler.Instance;
-	private readonly ManualResetEvent lockTite = new ManualResetEvent(false);
+	private readonly ManualResetEvent lockTite = new(false);
 	private readonly Random random = new();
+
+	private int hwnd = hwnd;
 
 	private Options options;
 	private WebSocket? ws;
@@ -42,55 +44,93 @@ public partial class Bot {
 		 ws.Connect();
 
 		 Console.WriteLine("Socket opened");
-
+		 
 		 ws.Send($"PASS {options.OAuth}");
 		 ws.Send($"NICK {options.Nick}");
 		 ws.Send($"JOIN #{options.Channel}");
+		 ws.Send("CAP REQ :twitch.tv/membership twitch.tv/tags twitch.tv/commands twitch.tv/foo");
 
-		 ws.OnMessage += OnMessage;
+		 ws.OnMessage += (_, args) => {
+			 foreach (var message in args.Data.Trim().Split('\n')) {
+				 OnMessage(Message.From(message));
+			 }
+		 };
+		 
 		 ws.OnClose += OnClose;
 		 
 		 lockTite.WaitOne();
 	}
 
-	private void OnMessage(object? sender, MessageEventArgs message) {
-		Message msg = Message.From(message.Data.Trim());
-	
-		if (msg.Type == "PING") {
-			ws!.Send($"PONG {msg.Body}");
-			
-			return;
+	public void SendMessage(string text) {
+		if (ws!.IsAlive) {
+			ws.Send(text);
 		}
-	
-		// Disconnect if channel changes (Such as from a raid)
-		if (msg.Channel != null && msg.Channel != options.Channel) {
-			logger.Warn("Channel changed. Shutting down");
-			
-			ws!.Send($"PART #{msg.Channel}");
-			ws.Close(CloseStatusCode.Normal);
-		}
-		
-		if (msg.Author is null) {
-			return;
+	}
+
+	private void OnMessage(Message msg) {
+		LogColor prefix = LogColor.Reset;
+
+		switch (msg.Type) {
+			case MessageType.PING:
+				HandlePing(msg);
+				return;
+			case MessageType.PRIVMSG:
+				HandlePrivateMessage(msg, out prefix);
+				break;
+			case MessageType.USERNOTICE:
+				HandleUserNotice(msg, out prefix);
+				break;
+			case MessageType.NONE:
+				logger.Error($"Message with unknown type: {msg.Body}");
+				return;
+			case MessageType.NUM:
+				break;
+			default:
+				return;
 		}
 
-		LogColor highlight = LogColor.Reset;
-
-		if (msg.Author is "wizebot" && msg.Body.Contains("\u2b50\ufe0f")) {
-			logger.Log("New subscriber message found, queueing message...");
-			QueueMessage();
-		} else if (msg.Author != options.Nick && msg.Author != "dunkbot" && msg.Body.Contains(options.Nick, StringComparison.OrdinalIgnoreCase)) {
-			highlight = LogColor.BgYellow;
-			WindowUtils.FlashWindow(0, 150, 10);
-		} else if (msg.Author == options.Channel && msg.Body.Contains("!open", StringComparison.OrdinalIgnoreCase)) {
-			highlight = LogColor.BgYellow;
-		}
-
-		logger.Log($"{LogColor.FgGreen}{msg.Author}{LogColor.Reset}: {highlight}{msg.Body}");
+		logger.Log($"{LogColor.FgGreen}{msg.Author}{LogColor.Reset}: {prefix}{msg.Body}");
 	}
 
 	private void OnClose(object? sender, CloseEventArgs args) {
 		lockTite.Set();
+	}
+
+	private void HandlePing(Message msg) {
+		ws!.Send($"PONG {msg.Body}");
+	}
+
+	private void HandlePrivateMessage(Message msg, out LogColor prefix) {
+		prefix = LogColor.Reset;
+
+		// Disconnect if channel changes (Such as from a raid)
+		if (msg.Channel != options.Channel) {
+			logger.Warn("Channel changed. Shutting down");
+
+			ws!.Send($"PART #{msg.Channel}");
+			ws.Close(CloseStatusCode.Normal);
+			
+			return;
+		}
+		
+		if (msg.Author != "dunkbot" && msg.Body.Contains(options.Nick, StringComparison.OrdinalIgnoreCase)) {
+			prefix = LogColor.BgYellow;
+			WindowUtils.FlashWindow(hwnd, 150, 10);
+		} else if (msg.Author == options.Channel && msg.Body.StartsWith("!open", StringComparison.OrdinalIgnoreCase)) {
+			prefix = LogColor.BgYellow;
+		}
+		
+	}
+
+	private void HandleUserNotice(Message msg, out LogColor prefix) {
+		prefix = LogColor.Reset;
+
+		if (msg.Tags["msg-id"].Contains("sub")) {
+			logger.Log("New subscriber message found, queueing message...");
+			prefix = LogColor.BgCyan;
+			
+			QueueMessage();
+		}
 	}
 
 	private void QueueMessage() {
@@ -102,40 +142,11 @@ public partial class Bot {
 		messageQueued = true;
 
 		scheduler.ScheduleSync(() => {
-			if (!ws!.IsAlive) return;
-			
-			ws.Send($"PRIVMSG #{options.Channel} :{options.Messages[lastIndex]}");
+			SendMessage($"PRIVMSG #{options.Channel} :{options.Messages[lastIndex]}");
+
 			lastIndex = lastIndex + 1 > options.Messages.Length ? lastIndex + 1 : 0;
 			messageQueued = false;
 		}, delay * 50);
 	}
-
-	private partial struct Message(string? author, string? type, string? channel, string body) {
-
-		private const string MessagePattern =
-			@":([a-z0-9_]{4,25})!\1@\1\.tmi\.twitch\.tv ([A-Z]+) #([a-z0-9_]{4,25}) :(.+)";
-
-		public readonly string? Author = author;
-		public readonly string? Type = type;
-		public readonly string? Channel = channel;
-		public readonly string Body = body;
-
-		public static Message From(string text) {
-			var match = MyRegex().Match(text);
-
-			if (match is { Success: true, Groups.Count: 5 }) {
-				var groups = match.Groups;
-				return new Message(groups[1].ToString(), groups[2].ToString(), groups[3].ToString(), groups[4].ToString());
-			}
-
-			string? type = text.Contains("PING") ? "PING" : null;
-			string body = type is null ? text : text[5..];
-
-			return new Message(null, type, null, body);
-		}
-
-        [GeneratedRegex(MessagePattern)]
-        private static partial Regex MyRegex();
-    }
 
 }

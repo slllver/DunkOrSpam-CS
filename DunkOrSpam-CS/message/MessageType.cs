@@ -1,0 +1,20 @@
+namespace DunkOrSpam_CS.message;
+
+public enum MessageType {
+
+	NONE = 0,
+	NUM,
+	PING,
+	CAP,
+	CLEARCHAT,
+	CLEARMSG,
+	GLOBALUSERSTATE,
+	JOIN,
+	NOTICE,
+	PART,
+	PRIVMSG,
+	ROOMSTATE,
+	USERNOTICE,
+	USERSTATE
+
+}

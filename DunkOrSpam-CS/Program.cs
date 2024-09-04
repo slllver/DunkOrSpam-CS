@@ -4,7 +4,7 @@ namespace DunkOrSpam_CS;
 
 public static class Program {
 
-	private const string Title = "DunkOrSpam";
+	private const string Title = "DunkOrSpam-CS";
 
 	public static Logger? Logger { get; private set; }
 	
@@ -12,20 +12,21 @@ public static class Program {
 	public static void Main() {
 		Console.Title = Title;
 		ConsoleUtils.EnableColorFormat();
-		Logger = new Logger(WindowUtils.FindWindow(Title).ToInt32());
+		
+		int hwnd = 0;
 
-		// Bot bot = new();
-		//
-		// bot.LoadConfig("./config.json");
-		// bot.Connect();
+		// Certified jank to grab window title because it doesn't always update immediately
+		// Setting Console.Title seems to update the actual window title asynchronously
+		while (hwnd <= 0) {
+			hwnd = WindowUtils.FindWindow(Title).ToInt32();
+		}
 
-		int i = WindowUtils.FindWindow(Title).ToInt32();
+		Logger = new Logger(hwnd);
 
-		// TODO: IT'S A FUCKING RACE CONDITION. i'm going to bed.
-		Console.WriteLine(WindowUtils.GetScroll(i));
-		Console.WriteLine(WindowUtils.GetScroll(WindowUtils.FindWindow(Title)));
-
-		Console.ReadKey();
+		Bot bot = new(hwnd);
+		
+		bot.LoadConfig("./config.json");
+		bot.Connect();
 	}
 	
 }

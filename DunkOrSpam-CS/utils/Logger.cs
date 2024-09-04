@@ -30,7 +30,7 @@ public class Logger(int hwnd) {
 
 	private void Spool(string text) {
 		lock (LogLock) {
-			int currPos = WindowUtils.GetScroll(hwnd);
+			int currPos = WindowUtils.InvokeScroll(hwnd).Result;
 
 			if (currPos < lastPos) {
 				QueueMessage(text);
@@ -41,7 +41,7 @@ public class Logger(int hwnd) {
 				Console.WriteLine(text);
 			}
 			
-			lastPos = WindowUtils.GetScroll(hwnd);
+			lastPos = WindowUtils.InvokeScroll(hwnd).Result;
 		}
 	}
 

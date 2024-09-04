@@ -50,7 +50,7 @@ public static class WindowUtils {
 	private static extern bool GetScrollInfo(IntPtr hwnd, int nBar, ref LPSCROLLINFO lpsi);
 
 	#endregion
-
+	
 	/// <summary>
 	/// Gets the handle of the given window by name
 	/// </summary>
@@ -85,7 +85,7 @@ public static class WindowUtils {
 	/// </summary>
 	/// <param name="hwnd"></param>
 	/// <returns></returns>
-	public static int GetScroll(IntPtr hwnd) {
+	private static int GetScroll(IntPtr hwnd) {
 		LPSCROLLINFO lpsi = new LPSCROLLINFO();
 
 		lpsi.cbSize = Convert.ToUInt32(Marshal.SizeOf(lpsi));
@@ -94,9 +94,15 @@ public static class WindowUtils {
 
 		bool success = GetScrollInfo(hwnd, SbVert, ref lpsi);
 
-		Console.WriteLine(success + " a");
-
 		return success ? lpsi.nPos : -1;
+	}
+
+	public static async Task<int> InvokeScroll(IntPtr hwnd) {
+		int scroll = -1;
+
+		await Task.Run(() => scroll = GetScroll(hwnd));
+		
+		return scroll;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
