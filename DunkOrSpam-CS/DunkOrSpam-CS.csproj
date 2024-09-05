@@ -8,6 +8,7 @@
         <Nullable>enable</Nullable>
         <LangVersion>12</LangVersion>
         <ApplicationIcon>icon.ico</ApplicationIcon>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
